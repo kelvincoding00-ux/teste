@@ -8,34 +8,35 @@ let pauseTimers = [false, false, false];
 const warningLabel = document.getElementById('warnings');
 const timers = document.querySelectorAll('.timer');
 
-// Variáveis para áudio
-let audioCtx;
-let bellBuffer = null;
+// 🎧 Variáveis para áudio
+let audioCtx = null;
 
-// Carregar o som para dentro de um buffer
-async function loadBellSound() {
-  const response = await fetch('bell.wav');
-  const arrayBuffer = await response.arrayBuffer();
-  bellBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-}
-
-// Reproduzir o som usando o AudioContext
-function playBell() {
-  if (!bellBuffer || !audioCtx) return;
-  const source = audioCtx.createBufferSource();
-  source.buffer = bellBuffer;
-  source.connect(audioCtx.destination);
-  source.start();
-}
-
-// Inicializar o AudioContext na primeira interação do usuário
-document.addEventListener('click', async () => {
+// 🧭 Inicializa o AudioContext na primeira interação
+document.addEventListener('click', () => {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    await loadBellSound();
-    console.log('AudioContext inicializado e bell.wav carregado ✅');
+    console.log('✅ AudioContext inicializado');
   }
 });
+
+// 🔔 Função para tocar um beep curto
+function playBeep() {
+  if (!audioCtx) return; // ainda não foi inicializado
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.type = 'sine';       // tipo do som (pode trocar para 'square', 'sawtooth', etc.)
+  oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // frequência em Hz (880 = tom agudo)
+
+  gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); // volume inicial
+  gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4); // fade out
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  oscillator.start();
+  oscillator.stop(audioCtx.currentTime + 0.4); // beep de 0.4s
+}
 
 timers.forEach((timer, i) => {
   const timeDisplay = timer.querySelector('.time');
@@ -74,6 +75,7 @@ function updateDisplay(i) {
     `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+// ⏸️ Pausa 10s e depois retoma
 function pauseAndResume(i) {
   pauseTimers[i] = true;
   setTimeout(() => {
@@ -83,6 +85,7 @@ function pauseAndResume(i) {
   }, 10000);
 }
 
+// ⏳ Loop dos timers
 function updateTimers() {
   const now = Date.now();
   for (let i = 0; i < 3; i++) {
@@ -94,7 +97,7 @@ function updateTimers() {
         updateDisplay(i);
 
         if (seconds[i] === 60) {
-          playBell(); // ✅ tocar via AudioContext
+          playBeep(); // 🔔 toca beep de 0.4s
         } else if (seconds[i] === 0) {
           seconds[i] = totalSeconds;
           warnings++;
