@@ -3,11 +3,39 @@ let seconds = [totalSeconds, totalSeconds, totalSeconds];
 let running = [false, false, false];
 let lastUpdate = [Date.now(), Date.now(), Date.now()];
 let warnings = 0;
-let pauseTimers = [false, false, false]; // NOVO
+let pauseTimers = [false, false, false];
 
 const warningLabel = document.getElementById('warnings');
-const bellSound = document.getElementById('bell');
 const timers = document.querySelectorAll('.timer');
+
+// Variáveis para áudio
+let audioCtx;
+let bellBuffer = null;
+
+// Carregar o som para dentro de um buffer
+async function loadBellSound() {
+  const response = await fetch('bell.wav');
+  const arrayBuffer = await response.arrayBuffer();
+  bellBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+}
+
+// Reproduzir o som usando o AudioContext
+function playBell() {
+  if (!bellBuffer || !audioCtx) return;
+  const source = audioCtx.createBufferSource();
+  source.buffer = bellBuffer;
+  source.connect(audioCtx.destination);
+  source.start();
+}
+
+// Inicializar o AudioContext na primeira interação do usuário
+document.addEventListener('click', async () => {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    await loadBellSound();
+    console.log('AudioContext inicializado e bell.wav carregado ✅');
+  }
+});
 
 timers.forEach((timer, i) => {
   const timeDisplay = timer.querySelector('.time');
@@ -26,14 +54,14 @@ timers.forEach((timer, i) => {
     running[i] = false;
     seconds[i] = totalSeconds;
     updateDisplay(i);
-    pauseAndResume(i); // pausa 10 segundos e retoma
+    pauseAndResume(i);
   });
 
   msgBtn.addEventListener('click', () => {
     running[i] = false;
     seconds[i] = totalSeconds;
     updateDisplay(i);
-    pauseAndResume(i); // pausa 10 segundos e retoma
+    pauseAndResume(i);
   });
 
   updateDisplay(i);
@@ -43,7 +71,7 @@ function updateDisplay(i) {
   const mins = Math.floor(seconds[i] / 60);
   const secs = seconds[i] % 60;
   timers[i].querySelector('.time').textContent =
-    `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+    `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
 function pauseAndResume(i) {
@@ -52,18 +80,8 @@ function pauseAndResume(i) {
     pauseTimers[i] = false;
     running[i] = true;
     lastUpdate[i] = Date.now();
-  }, 10000); // 10 segundos
+  }, 10000);
 }
-
-// manter o AudioContext ativo mesmo em background
-let audioCtx;
-document.addEventListener('click', () => {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const source = audioCtx.createMediaElementSource(bellSound);
-    source.connect(audioCtx.destination);
-  }
-});
 
 function updateTimers() {
   const now = Date.now();
@@ -76,8 +94,7 @@ function updateTimers() {
         updateDisplay(i);
 
         if (seconds[i] === 60) {
-          bellSound.currentTime = 0;
-          bellSound.play().catch(() => {});
+          playBell(); // ✅ tocar via AudioContext
         } else if (seconds[i] === 0) {
           seconds[i] = totalSeconds;
           warnings++;
