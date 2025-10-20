@@ -8,56 +8,56 @@ let pauseTimers = [false, false, false];
 const warningLabel = document.getElementById('warnings');
 const timers = document.querySelectorAll('.timer');
 
-// 🎧 AudioContext para beep local (quando aba está ativa)
+// 🔊 AudioContext global
 let audioCtx = null;
 
-// Inicializa áudio e solicita permissão de notificação
-document.addEventListener('click', () => {
+// Inicializa áudio e notificação na primeira interação
+document.addEventListener('click', async () => {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    console.log('✅ AudioContext iniciado');
+    await audioCtx.resume();
+    console.log('✅ AudioContext ativo');
   }
 
   if ('Notification' in window && Notification.permission !== 'granted') {
-    Notification.requestPermission().then(p => {
-      console.log('Permissão de notificação:', p);
-    });
+    Notification.requestPermission();
   }
 });
 
-// 🔔 Beep local — só toca se aba estiver ativa
-function playBeep() {
+// 🔔 Beep mesmo em segundo plano
+async function playBeep() {
   if (!audioCtx) return;
+  await audioCtx.resume(); // força retomar mesmo se a aba estiver em segundo plano
+
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
 
   osc.type = 'sine';
   osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+  gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
 
   osc.connect(gain);
   gain.connect(audioCtx.destination);
+
   osc.start();
-  osc.stop(audioCtx.currentTime + 0.4);
+  osc.stop(audioCtx.currentTime + 0.5);
 }
 
-// 📨 Notificação com som padrão do Chrome / SO
-function sendSystemNotification(message) {
+// Notificação visual (sem depender de som do Chrome)
+function sendNotification(message) {
   if ('Notification' in window && Notification.permission === 'granted') {
     new Notification('Timer App', {
       body: message,
-      silent: false // ✅ habilita som padrão do sistema
+      silent: true // ⚠️ Chrome ignora som, então deixamos silent e usamos nosso beep
     });
   }
 }
 
-// Alerta sonoro (sistema + beep local se aba ativa)
+// Envia alerta com beep garantido
 function sendAlert(message) {
-  sendSystemNotification(message);
-  if (document.visibilityState === 'visible') {
-    playBeep();
-  }
+  sendNotification(message);
+  playBeep(); // toca sempre, mesmo em background
 }
 
 // Configuração dos botões
@@ -91,7 +91,6 @@ timers.forEach((timer, i) => {
   updateDisplay(i);
 });
 
-// Atualiza exibição de tempo
 function updateDisplay(i) {
   const mins = Math.floor(seconds[i] / 60);
   const secs = seconds[i] % 60;
@@ -99,7 +98,6 @@ function updateDisplay(i) {
     `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-// Pausa 10 s e retoma
 function pauseAndResume(i) {
   pauseTimers[i] = true;
   setTimeout(() => {
@@ -109,7 +107,6 @@ function pauseAndResume(i) {
   }, 10000);
 }
 
-// Loop principal dos timers
 function updateTimers() {
   const now = Date.now();
   for (let i = 0; i < 3; i++) {
