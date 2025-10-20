@@ -61,3 +61,12 @@ button:hover {
 .end-btn:hover {
   background: #a71d2a;
 }
+
+.message-btn {
+  background: #28a745;
+}
+
+.message-btn:hover {
+  background: #1e7e34;
+}
+
