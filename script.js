@@ -8,56 +8,59 @@ let pauseTimers = [false, false, false];
 const warningLabel = document.getElementById('warnings');
 const timers = document.querySelectorAll('.timer');
 
-// 🔔 Áudio via Oscillator
+// 🎧 AudioContext para beep local (quando aba está ativa)
 let audioCtx = null;
 
+// Inicializa áudio e solicita permissão de notificação
 document.addEventListener('click', () => {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     console.log('✅ AudioContext iniciado');
-    requestNotificationPermission();
+  }
+
+  if ('Notification' in window && Notification.permission !== 'granted') {
+    Notification.requestPermission().then(p => {
+      console.log('Permissão de notificação:', p);
+    });
   }
 });
 
-// Função beep (fallback)
+// 🔔 Beep local — só toca se aba estiver ativa
 function playBeep() {
   if (!audioCtx) return;
-  const oscillator = audioCtx.createOscillator();
-  const gainNode = audioCtx.createGain();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
 
-  oscillator.type = 'sine';
-  oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
-  gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
 
-  oscillator.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
-  oscillator.start();
-  oscillator.stop(audioCtx.currentTime + 0.4);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.4);
 }
 
-// 🪟 Notifications API
-function requestNotificationPermission() {
-  if ('Notification' in window) {
-    Notification.requestPermission().then(permission => {
-      console.log('🔔 Permissão de notificação:', permission);
+// 📨 Notificação com som padrão do Chrome / SO
+function sendSystemNotification(message) {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('Timer App', {
+      body: message,
+      silent: false // ✅ habilita som padrão do sistema
     });
   }
 }
 
-function sendNotification(message) {
-  if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification('Timer App', {
-      body: message,
-      icon: 'https://cdn-icons-png.flaticon.com/512/1827/1827951.png',
-      silent: false // para que toque som do sistema
-    });
-  } else {
+// Alerta sonoro (sistema + beep local se aba ativa)
+function sendAlert(message) {
+  sendSystemNotification(message);
+  if (document.visibilityState === 'visible') {
     playBeep();
   }
 }
 
-// Botões e timers
+// Configuração dos botões
 timers.forEach((timer, i) => {
   const timeDisplay = timer.querySelector('.time');
   const startBtn = timer.querySelector('.start-btn');
@@ -88,6 +91,7 @@ timers.forEach((timer, i) => {
   updateDisplay(i);
 });
 
+// Atualiza exibição de tempo
 function updateDisplay(i) {
   const mins = Math.floor(seconds[i] / 60);
   const secs = seconds[i] % 60;
@@ -95,6 +99,7 @@ function updateDisplay(i) {
     `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+// Pausa 10 s e retoma
 function pauseAndResume(i) {
   pauseTimers[i] = true;
   setTimeout(() => {
@@ -104,6 +109,7 @@ function pauseAndResume(i) {
   }, 10000);
 }
 
+// Loop principal dos timers
 function updateTimers() {
   const now = Date.now();
   for (let i = 0; i < 3; i++) {
@@ -115,13 +121,13 @@ function updateTimers() {
         updateDisplay(i);
 
         if (seconds[i] === 60) {
-          sendNotification('Falta 1 minuto!');
+          sendAlert('Falta 1 minuto!');
         } else if (seconds[i] === 0) {
           seconds[i] = totalSeconds;
           warnings++;
           warningLabel.textContent = `Warnings: ${warnings}`;
           updateDisplay(i);
-          sendNotification('Tempo esgotado!');
+          sendAlert('Tempo esgotado!');
         }
       }
     }
