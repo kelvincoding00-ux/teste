@@ -8,36 +8,56 @@ let pauseTimers = [false, false, false];
 const warningLabel = document.getElementById('warnings');
 const timers = document.querySelectorAll('.timer');
 
-// 🎧 Variáveis para áudio
+// 🔔 Áudio via Oscillator
 let audioCtx = null;
 
-// 🧭 Inicializa o AudioContext na primeira interação
 document.addEventListener('click', () => {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    console.log('✅ AudioContext inicializado');
+    console.log('✅ AudioContext iniciado');
+    requestNotificationPermission();
   }
 });
 
-// 🔔 Função para tocar um beep curto
+// Função beep (fallback)
 function playBeep() {
-  if (!audioCtx) return; // ainda não foi inicializado
+  if (!audioCtx) return;
   const oscillator = audioCtx.createOscillator();
   const gainNode = audioCtx.createGain();
 
-  oscillator.type = 'sine';       // tipo do som (pode trocar para 'square', 'sawtooth', etc.)
-  oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // frequência em Hz (880 = tom agudo)
-
-  gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); // volume inicial
-  gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4); // fade out
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+  gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
 
   oscillator.connect(gainNode);
   gainNode.connect(audioCtx.destination);
-
   oscillator.start();
-  oscillator.stop(audioCtx.currentTime + 0.4); // beep de 0.4s
+  oscillator.stop(audioCtx.currentTime + 0.4);
 }
 
+// 🪟 Notifications API
+function requestNotificationPermission() {
+  if ('Notification' in window) {
+    Notification.requestPermission().then(permission => {
+      console.log('🔔 Permissão de notificação:', permission);
+    });
+  }
+}
+
+function sendNotification(message) {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('Timer App', {
+      body: message,
+      icon: 'https://cdn-icons-png.flaticon.com/512/1827/1827951.png',
+      silent: false // para que toque som do sistema
+    });
+  } else {
+    playBeep();
+  }
+}
+
+// Botões e timers
 timers.forEach((timer, i) => {
   const timeDisplay = timer.querySelector('.time');
   const startBtn = timer.querySelector('.start-btn');
@@ -75,7 +95,6 @@ function updateDisplay(i) {
     `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-// ⏸️ Pausa 10s e depois retoma
 function pauseAndResume(i) {
   pauseTimers[i] = true;
   setTimeout(() => {
@@ -85,7 +104,6 @@ function pauseAndResume(i) {
   }, 10000);
 }
 
-// ⏳ Loop dos timers
 function updateTimers() {
   const now = Date.now();
   for (let i = 0; i < 3; i++) {
@@ -97,12 +115,13 @@ function updateTimers() {
         updateDisplay(i);
 
         if (seconds[i] === 60) {
-          playBeep(); // 🔔 toca beep de 0.4s
+          sendNotification('Falta 1 minuto!');
         } else if (seconds[i] === 0) {
           seconds[i] = totalSeconds;
           warnings++;
           warningLabel.textContent = `Warnings: ${warnings}`;
           updateDisplay(i);
+          sendNotification('Tempo esgotado!');
         }
       }
     }
